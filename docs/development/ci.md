@@ -1,5 +1,31 @@
 # CI on pull requests
 
+## Standalone staging service builds
+
+`Build staging service image` is a manual-only workflow for a fork without
+the private Namespace runners or cloud deployment credentials. It runs on a
+standard GitHub-hosted Linux runner, builds one allowlisted service through
+its existing Nix deploy package, and publishes the binary plus its runtime
+closure to `ghcr.io/<repository-owner>/macro-<service>:<commit-sha>`.
+
+Choose the service key in the `component` input, starting with
+`authentication-service`. It verifies workflow generation and runs the workflow
+package's tests on Linux before building. This workflow only builds an image: it does not
+run migrations, start a server, or deploy infrastructure. Deployments should
+use the resulting registry digest and independent environment configuration.
+New GHCR packages may require package visibility or pull-access configuration
+before a remote host can retrieve them.
+
+The runner has no private build cache, so a cold build can be expensive in
+time and disk space. It is bounded to one Nix build job with two cores and
+has a three-hour timeout. Verify the first build before queuing other services.
+
+The workflow is generated from
+`tooling/xtask/crates/xtask_workflows/src/workflows/build_staging_images.rs`.
+Regenerate it with `cargo x workflows`; do not edit its YAML directly.
+
+## Pull request checks
+
 CI runs on a pull request only when someone adds the `run-ci` label. The `PR CI`
 workflow then runs every check on the PR's head commit, removes the label, and
 reports the result as the `CI gate` commit status on that commit. Each push

@@ -14,10 +14,12 @@ use std::fmt;
 /// off Namespace deliberately — migrations need to reach RDS.
 pub const DB_MIGRATOR: &str = "db-migrator";
 
-/// A Namespace runner profile. The set of profiles we're allowed to target is
+/// A CI runner profile. The set of profiles we're allowed to target is
 /// closed; `Display` renders the `runs-on` label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Runner {
+    /// Standard GitHub-hosted Linux runner for builds without private infrastructure.
+    GitHubLinux,
     /// Tiny profile for lightweight automation that does not need cache volume.
     TinyNoCache,
     /// Small profile for light jobs (path filtering, status aggregation).
@@ -46,6 +48,7 @@ pub enum Runner {
 impl fmt::Display for Runner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
+            Runner::GitHubLinux => "ubuntu-24.04",
             Runner::TinyNoCache => "namespace-profile-linux-tiny-no-cache",
             Runner::Small => "namespace-profile-linux-small",
             Runner::Mid => "namespace-profile-linux-mid",

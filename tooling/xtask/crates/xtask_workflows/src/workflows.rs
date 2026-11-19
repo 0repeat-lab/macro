@@ -22,6 +22,7 @@ mod build_appimage_on_tag;
 mod build_cef_codecs;
 mod build_desktop_on_tag;
 mod build_dmg_on_tag;
+mod build_staging_images;
 mod build_web_app;
 mod cancel_stuck_cloud_storage_deploys;
 mod cargo_deny;
@@ -133,6 +134,11 @@ fn job_mut<'a>(root: &'a mut serde_yaml::Value, id: &str) -> Result<&'a mut serd
 
 /// Every workflow we generate. Add new workflows here.
 const WORKFLOWS: &[WorkflowFile] = &[
+    WorkflowFile {
+        slug: "build_staging_images",
+        file_name: "build_staging_images.yml",
+        render_yaml: || render_gh_workflow(build_staging_images::build_staging_images)(),
+    },
     WorkflowFile {
         slug: "observability_image",
         file_name: "observability_image.yml",
