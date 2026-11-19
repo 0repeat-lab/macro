@@ -36,6 +36,26 @@ The workflow is generated from
 `tooling/xtask/crates/xtask_workflows/src/workflows/build_staging_images.rs`.
 Regenerate it with `cargo x workflows`; do not edit its YAML directly.
 
+`Build staging clients` independently builds `web`, `lexical-service`,
+`sync-service`, or `all` on standard Linux runners. It validates generated
+workflows and the workflow package tests before building, then publishes
+commit-tagged images with only the job's registry token. It never deploys,
+accepts application secrets or uses upstream cloud accounts. Client image
+publication has its own concurrency group and different image names from
+the Rust backend build.
+
+The web image follows the headless local stack: sequential WASM preparation,
+an optimized development-mode bundle and `same-origin` backend routing. It
+includes local-only UI behavior and must stay behind a private access boundary
+with synthetic data. It is not a production frontend or evidence of safe
+employee SSO. Its non-root static server exposes container port 8080; a separate
+authenticated gateway must supply backend routes before testing the app.
+Analytics build keys/exporter are empty; inspect actual browser traffic before
+claiming the absence of external calls. Editor and sync images reuse their
+existing Dockerfiles without passing package or cloud credentials. Resolve all
+resulting image digests, configure independent runtime secrets and verify
+health, storage and permissions before activation.
+
 ## Pull request checks
 
 CI runs on a pull request only when someone adds the `run-ci` label. The `PR CI`

@@ -1,0 +1,8 @@
+# Private synthetic pilot only: includes local-stack UI behavior.
+FROM caddy:2-alpine
+COPY apps/web/dist/ /srv/app/
+COPY docker/staging-web.Caddyfile /etc/caddy/Caddyfile
+USER 65532:65532
+ENV HOME=/tmp XDG_CONFIG_HOME=/tmp/config XDG_DATA_HOME=/tmp/data
+EXPOSE 8080
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
