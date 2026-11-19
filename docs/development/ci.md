@@ -16,6 +16,16 @@ use the resulting registry digest and independent environment configuration.
 New GHCR packages may require package visibility or pull-access configuration
 before a remote host can retrieve them.
 
+Use `task-services` after verifying authentication to build the remaining eight
+core Rust task services sequentially in one runner. They reuse the dependency
+build rather than starting a cold runner for every image. Email and calendar
+remain explicit individual selections; this batch does not deploy services or
+build the JavaScript frontend/workers. Search uses the existing local target
+without PDF's platform-specific runtime library.
+The staging workflow serializes runs across selections, so a batch cannot race
+an individual build that publishes the same service tag. Wait for the active
+run before dispatching further selections.
+
 The runner has no private build cache, so a cold build can be expensive in
 time and disk space. It is bounded to one Nix build job with two cores and
 has a three-hour timeout. Verify the first build before queuing other services.

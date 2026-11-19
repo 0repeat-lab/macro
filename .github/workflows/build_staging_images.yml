@@ -5,7 +5,7 @@ name: Build staging service image
   workflow_dispatch:
     inputs:
       component:
-        description: Service key from the staging build allowlist
+        description: A service key, or task-services for the remaining core task backends
         required: true
         type: string
         default: authentication-service
@@ -14,7 +14,7 @@ permissions:
   packages: write
 jobs:
   build:
-    name: Build and publish Linux service image
+    name: Build and publish selected Linux service images
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -27,20 +27,9 @@ jobs:
       run: |
         set -euo pipefail
         case "$COMPONENT" in
-          authentication-service) binary=authentication_service ;;
-          connection-gateway) binary=connection_gateway_service ;;
-          contacts-service) binary=contacts_service ;;
-          document-storage-service) binary=document_storage_service ;;
-          notification-service) binary=notification_service ;;
-          search-processing-service) binary=search_processing_service ;;
-          email-service) binary=email_service ;;
-          calendar-service) binary=calendar_service ;;
-          static-file-service) binary=static_file_service ;;
-          image-proxy-service) binary=image_proxy_service ;;
-          unfurl-service) binary=unfurl_service ;;
+          authentication-service|connection-gateway|contacts-service|document-storage-service|notification-service|search-processing-service|email-service|calendar-service|static-file-service|image-proxy-service|unfurl-service|task-services) ;;
           *) echo 'Unsupported staging service' >&2; exit 1 ;;
         esac
-        printf 'binary=%s\n' "$binary" >> "$GITHUB_OUTPUT"
       shell: bash
       env:
         COMPONENT: ${{ inputs.component }}
@@ -57,10 +46,12 @@ jobs:
       shell: bash
     - name: Setup Nix
       uses: './.github/actions/setup-nix'
-    - name: Build Linux binary and runtime closure
+    - name: Build authentication-service
+      if: ${{ inputs.component == 'authentication-service' || (inputs.component == 'task-services' && false) }}
       run: |
         set -euo pipefail
-        nix build --max-jobs 1 --cores 2 --print-build-logs ".#deploy-service-binaries-${COMPONENT}"
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
         mkdir -p prebuilt/nix-store
         cp -r result/bin/* prebuilt/
         nix-store -qR result > runtime-closure.txt
@@ -69,8 +60,9 @@ jobs:
         done < runtime-closure.txt
       shell: bash
       env:
-        COMPONENT: ${{ inputs.component }}
-    - name: Publish immutable commit image
+        NIX_TARGET: deploy-service-binaries-authentication-service
+    - name: Publish authentication-service
+      if: ${{ inputs.component == 'authentication-service' || (inputs.component == 'task-services' && false) }}
       run: |
         set -euo pipefail
         owner="${GITHUB_REPOSITORY_OWNER,,}"
@@ -82,11 +74,363 @@ jobs:
           --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
         docker push "$image"
         docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
       shell: bash
       env:
-        COMPONENT: ${{ inputs.component }}
-        BINARY: ${{ steps.component.outputs.binary }}
+        COMPONENT: authentication-service
+        BINARY: authentication_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build connection-gateway
+      if: ${{ inputs.component == 'connection-gateway' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-connection-gateway
+    - name: Publish connection-gateway
+      if: ${{ inputs.component == 'connection-gateway' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: connection-gateway
+        BINARY: connection_gateway_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build contacts-service
+      if: ${{ inputs.component == 'contacts-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-contacts-service
+    - name: Publish contacts-service
+      if: ${{ inputs.component == 'contacts-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: contacts-service
+        BINARY: contacts_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build document-storage-service
+      if: ${{ inputs.component == 'document-storage-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-document-storage-service
+    - name: Publish document-storage-service
+      if: ${{ inputs.component == 'document-storage-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: document-storage-service
+        BINARY: document_storage_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build notification-service
+      if: ${{ inputs.component == 'notification-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-notification-service
+    - name: Publish notification-service
+      if: ${{ inputs.component == 'notification-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: notification-service
+        BINARY: notification_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build search-processing-service
+      if: ${{ inputs.component == 'search-processing-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: local-stack-binaries-local-search-processing
+    - name: Publish search-processing-service
+      if: ${{ inputs.component == 'search-processing-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: search-processing-service
+        BINARY: search_processing_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build email-service
+      if: ${{ inputs.component == 'email-service' || (inputs.component == 'task-services' && false) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-email-service
+    - name: Publish email-service
+      if: ${{ inputs.component == 'email-service' || (inputs.component == 'task-services' && false) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: email-service
+        BINARY: email_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build calendar-service
+      if: ${{ inputs.component == 'calendar-service' || (inputs.component == 'task-services' && false) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-calendar-service
+    - name: Publish calendar-service
+      if: ${{ inputs.component == 'calendar-service' || (inputs.component == 'task-services' && false) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: calendar-service
+        BINARY: calendar_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build static-file-service
+      if: ${{ inputs.component == 'static-file-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-static-file-service
+    - name: Publish static-file-service
+      if: ${{ inputs.component == 'static-file-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: static-file-service
+        BINARY: static_file_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build image-proxy-service
+      if: ${{ inputs.component == 'image-proxy-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-image-proxy-service
+    - name: Publish image-proxy-service
+      if: ${{ inputs.component == 'image-proxy-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: image-proxy-service
+        BINARY: image_proxy_service
+        REGISTRY_TOKEN: ${{ github.token }}
+    - name: Build unfurl-service
+      if: ${{ inputs.component == 'unfurl-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        test ! -e prebuilt
+        nix build --max-jobs 1 --cores 2 --print-build-logs ".#${NIX_TARGET}"
+        mkdir -p prebuilt/nix-store
+        cp -r result/bin/* prebuilt/
+        nix-store -qR result > runtime-closure.txt
+        while IFS= read -r store_path; do
+          cp -a "$store_path" prebuilt/nix-store/
+        done < runtime-closure.txt
+      shell: bash
+      env:
+        NIX_TARGET: deploy-service-binaries-unfurl-service
+    - name: Publish unfurl-service
+      if: ${{ inputs.component == 'unfurl-service' || (inputs.component == 'task-services' && true) }}
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        image="ghcr.io/${owner}/macro-${COMPONENT}:${GITHUB_SHA}"
+        trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+        printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker build -f docker/Dockerfile.prebuilt --build-arg "SERVICE_NAME=$BINARY" \
+          --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t "$image" .
+        docker push "$image"
+        docker inspect --format '{{join .RepoDigests "\n"}}' "$image" >> "$GITHUB_STEP_SUMMARY"
+        chmod -R u+w prebuilt
+        rm -rf -- prebuilt runtime-closure.txt
+      shell: bash
+      env:
+        COMPONENT: unfurl-service
+        BINARY: unfurl_service
         REGISTRY_TOKEN: ${{ github.token }}
 concurrency:
-  group: staging-image-${{ inputs.component }}
+  group: staging-image-${{ github.repository }}
   cancel-in-progress: false
