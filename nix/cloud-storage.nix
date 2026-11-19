@@ -1272,6 +1272,9 @@
       // deployLambdaPackages
       // pkgs.lib.optionalAttrs isLinux {
         local-stack-binaries = localStackBinaries;
+        # Staging builds the search service independently, without PDF's
+        # platform library or the rest of the local stack.
+        inherit (localStackBinaryPackages) local-stack-binaries-local-search-processing;
       };
 
       devShells = {

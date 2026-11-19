@@ -21,7 +21,9 @@ core Rust task services sequentially in one runner. They reuse the dependency
 build rather than starting a cold runner for every image. Email and calendar
 remain explicit individual selections; this batch does not deploy services or
 build the JavaScript frontend/workers. Search uses the existing local target
-without PDF's platform-specific runtime library.
+without PDF's platform-specific runtime library. That package is exported as
+`packages.x86_64-linux.local-stack-binaries-local-search-processing`; its
+definition inside the local bundle alone does not expose a flake build target.
 The staging workflow serializes runs across selections, so a batch cannot race
 an individual build that publishes the same service tag. Wait for the active
 run before dispatching further selections.
